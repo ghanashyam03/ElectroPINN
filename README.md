@@ -1,85 +1,211 @@
-# Battery PINN — Physics-Guided Temporal Transformer for Li-Ion State Estimation
+# ElectroPINN — Physics-Guided Temporal Transformer for Li-Ion State Estimation
 
-Research codebase for **robust lithium-ion battery state estimation under unseen dynamic current profiles**, using PyBaMM-generated data and a compact **causal temporal transformer** with optional **physics-guided losses**.
+Research-focused implementation of a compact **physics-guided temporal transformer** for lithium-ion battery state estimation under unseen dynamic current profiles using **PyBaMM-generated electrochemical trajectories**.
 
-**Project identity (unchanged):** estimate **SoC**, **terminal voltage**, and **cell temperature** from current and measured signals, and demonstrate that physics-guided training generalizes better than supervised-only training on unseen drive cycles.
+The project focuses on one problem only:
 
-## Scientific framing
+> Robust estimation of **State of Charge (SoC)**, terminal voltage, and cell temperature from sequential battery measurements under dynamic operating conditions.
 
-| Approach | Architecture | Supervision | Physics |
-|----------|--------------|-------------|---------|
-| Transformer baseline | Shared temporal transformer | SoC + V + T | None |
-| Physics-guided model | **Identical** transformer | SoC + V + T | Coulomb, differential, monotonicity, voltage/thermal consistency |
+The repository intentionally stays narrow in scope and avoids unnecessary expansion into unrelated battery domains.
 
-The only intentional difference between baseline and physics-guided paths is the **loss function**.
+---
 
-**Generalization protocol**
+# Core Idea
 
-- Train profiles: `constant`, `pulse`
-- Test profiles: `random`, `wltp`
-- **ID_RMSE:** validation on train-profile distribution
-- **OOD_RMSE:** test on unseen profiles
-- **Generalization score:** `OOD_RMSE / ID_RMSE` (lower is better; near 1.0 is ideal)
+Two models are compared under the exact same setup:
 
-## Architecture (compact temporal transformer)
+| Model | Architecture | Supervision | Physics Constraints |
+|---|---|---|---|
+| Baseline | Temporal Transformer | SoC + Voltage + Temperature | None |
+| Physics-Guided | Identical Transformer | SoC + Voltage + Temperature | Enabled |
 
-1. Input projection — `[current, voltage, temperature, elapsed_time]`
+The only intentional difference between the two paths is the addition of physics-guided loss terms.
+
+This allows a scientifically fair comparison between:
+- purely supervised temporal learning,
+- and physics-guided temporal learning.
+
+---
+
+# Scientific Objective
+
+The project evaluates whether physics-guided training improves:
+- robustness,
+- temporal consistency,
+- and generalization
+
+under unseen current profiles.
+
+## Train Profiles
+- `constant`
+- `pulse`
+
+## Unseen Test Profiles
+- `random`
+- `wltp`
+
+## Metrics
+
+- ID_RMSE → validation on train-profile distribution
+- OOD_RMSE → evaluation on unseen profiles
+- Generalization Score → `OOD_RMSE / ID_RMSE`
+
+Lower generalization score is better.
+
+---
+
+# Architecture
+
+Compact causal temporal transformer:
+
+1. Input projection
+   - `[current, voltage, temperature, elapsed_time]`
+
 2. Relative positional encoding
-3. Causal PreNorm transformer encoder (4 layers, 4 heads, 128 dim default)
-4. Shared latent sequence
-5. Multi-head readout — SoC, voltage, temperature
 
-No giant models, no HuggingFace stacks, no graph networks. Designed for **≤4 GB VRAM**.
+3. Causal transformer encoder
+   - PreNorm
+   - Multi-head self-attention
+   - GELU
+   - LayerNorm
+   - Residual connections
 
-## Installation
+4. Shared latent temporal representation
+
+5. Multi-head outputs
+   - SoC
+   - Voltage
+   - Temperature
+
+The architecture intentionally avoids:
+- giant foundation models,
+- HuggingFace dependencies,
+- graph neural networks,
+- overly complex battery PDE systems.
+
+The focus is precision and scientific clarity, not scale.
+
+---
+
+# Physics-Guided Constraints
+
+The physics-guided model introduces differentiable constraints including:
+
+- Coulomb consistency
+- Differential SoC consistency
+- Monotonic discharge behavior
+- Voltage-current consistency
+- Voltage smoothness
+- Thermal smoothness
+
+These constraints improve physical plausibility and temporal stability under unseen dynamics.
+
+---
+
+# Dataset Pipeline
+
+Battery trajectories are generated using:
+- PyBaMM
+- Single Particle Model (SPM)
+
+The pipeline:
+1. Generates electrochemical simulations
+2. Validates trajectories
+3. Exports Parquet datasets
+4. Preprocesses train/validation/test splits
+5. Trains transformer models
+6. Evaluates robustness and uncertainty
+
+---
+
+# Installation
 
 ```bash
-cd battery-pinn
 uv sync --all-extras
 ```
 
-**Detailed step-by-step instructions:** see [RUNBOOK.md](RUNBOOK.md).
+---
 
-## Workflow
+# Workflow
 
 | Command | Description |
-|---------|-------------|
-| `make install` | Install dependencies |
-| `make generate-data` | PyBaMM SPM simulations → Parquet + preprocess |
-| `make train-baseline` | Supervised transformer (no physics losses) |
-| `make train-pinn` | Physics-guided transformer |
-| `make evaluate` | Metrics, ID/OOD, uncertainty, OOD detection, plots |
-| `make ablation` | Automated physics-term ablation study |
-| `make benchmark` | Latency and memory report |
-| `make test` | Pytest suite |
+|---|---|
+| `make generate-data` | Generate PyBaMM simulations |
+| `make train-baseline` | Train supervised transformer |
+| `make train-pinn` | Train physics-guided transformer |
+| `make evaluate` | Generate metrics and plots |
+| `make benchmark` | Benchmark latency and memory |
+| `make ablation` | Run physics-loss ablation study |
+| `make test` | Run test suite |
 
-Windows (no Make):
+Windows equivalent:
 
 ```powershell
 uv run python -m data.generate_dataset
 uv run python -m training.train_baseline
 uv run python -m training.train_pinn
 uv run python -m evaluation.evaluate
-uv run python -m evaluation.ablation
-uv run pytest tests/ -m "not slow"
 ```
 
-Fast smoke: `$env:BATTERY_PINN_FAST_TEST="1"` before the commands above.
+---
 
-## Evaluation outputs
+# Evaluation Outputs
 
-**Preserved plots:** `predicted_vs_actual_soc`, `voltage_trajectory`, `training_curve`, `physics_loss_curve`, `error_distribution`, `unseen_profile_generalization`
+Generated outputs include:
 
-**Added plots:** `uncertainty_calibration`, `uncertainty_distribution`, `ood_detection_histogram`, `attention_visualization`, `ablation_results`
+- Predicted vs actual SoC
+- Voltage trajectories
+- Physics loss curves
+- Error distributions
+- Unseen-profile generalization plots
+- Attention visualizations
+- OOD detection histograms
+- MC-dropout uncertainty plots
 
-## Configuration
+---
 
-Hydra configs under `configs/` — model (`transformer`, `physics`, `ablation`), train, simulation.
+# Engineering Features
 
-## Reproducibility
+- Deterministic training
+- Physics-guided losses
+- Compact transformer implementation
+- Sequence-aware evaluation
+- MC-dropout uncertainty estimation
+- Mahalanobis OOD detection
+- Hydra configuration system
+- Automated ablation pipeline
+- GPU/CPU compatible execution
 
-Fixed seeds, deterministic cuDNN when CUDA is available, simulation validation rejects corrupted trajectories (NaNs, duplicate timestamps, out-of-bound SoC/voltage).
+---
 
-## License
+# Repository Structure
 
-MIT — portfolio and research extension.
+```text
+src/
+├── data/
+├── simulation/
+├── models/
+├── training/
+├── evaluation/
+└── utils/
+
+configs/
+tests/
+outputs/
+```
+
+---
+
+# Notes
+
+This repository is designed as:
+- a focused research project,
+- a scientifically grounded ML system,
+- and a robust engineering implementation of physics-guided temporal modeling for batteries.
+
+It intentionally prioritizes:
+- correctness,
+- clarity,
+- and disciplined scope
+
+over unnecessary feature expansion.
