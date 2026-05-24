@@ -1,0 +1,16 @@
+num_simulations: 100
+duration_s: 1800.0
+timestep_s: 10.0
+current_min_a: 0.5
+current_max_a: 5.0
+c_rates: [0.2, 0.5, 1.0, 1.5, 2.0]
+ambient_temperatures_c: [10.0, 25.0, 35.0]
+parameter_set: Chen2020
+profiles:
+  - constant
+  - pulse
+  - random
+  - wltp
+seed: 42
+fast_test_simulations: 3
+fast_test_duration_s: 60.0

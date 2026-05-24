@@ -1,0 +1,58 @@
+name: temporal_transformer
+
+transformer:
+  input_dim: 4
+  output_dim: 3
+  hidden_dim: 128
+  num_layers: 4
+  num_heads: 4
+  dropout: 0.1
+  max_seq_len: 512
+  nominal_capacity_ah: 5.0
+
+# Shared architecture for baseline and physics-guided paths
+baseline: ${transformer}
+pinn: ${transformer}
+
+physics:
+  lambda_data: 1.0
+  lambda_coulomb: 0.5
+  lambda_differential: 0.3
+  lambda_monotonicity: 0.2
+  lambda_voltage_smooth: 0.1
+  lambda_voltage_current: 0.1
+  lambda_thermal: 0.05
+  use_coulomb: true
+  use_differential: true
+  use_monotonicity: true
+  use_voltage_smooth: true
+  use_voltage_current: true
+  use_thermal: true
+
+uncertainty:
+  mc_samples: 20
+
+ood:
+  eps: 1.0e-5
+
+ablation:
+  max_epochs: 15
+  variants:
+    - name: transformer_baseline
+      toggles: {}
+      physics: false
+    - name: plus_coulomb
+      toggles: { coulomb: true }
+      physics: true
+    - name: plus_monotonicity
+      toggles: { coulomb: true, monotonicity: true }
+      physics: true
+    - name: plus_voltage
+      toggles: { coulomb: true, monotonicity: true, voltage_smooth: true, voltage_current: true }
+      physics: true
+    - name: plus_thermal
+      toggles: { coulomb: true, monotonicity: true, voltage_smooth: true, voltage_current: true, thermal: true }
+      physics: true
+    - name: full_physics
+      toggles: { coulomb: true, differential: true, monotonicity: true, voltage_smooth: true, voltage_current: true, thermal: true }
+      physics: true

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Project
+outputs/
+data/processed/
+data/checkpoints/
+data/raw/*.parquet
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/checkpoints/.gitkeep
+
+# Hydra
+.multirun/
+hydra_logs/
+
+# TensorBoard
+events.out.tfevents.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+Thumbs.db
+metadata.json

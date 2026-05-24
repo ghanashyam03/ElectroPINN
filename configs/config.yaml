@@ -1,0 +1,25 @@
+defaults:
+  - model: model
+  - train: train
+  - simulation: simulation
+  - _self_
+
+project:
+  name: battery-pinn
+  seed: 42
+  deterministic: true
+
+paths:
+  root: ${hydra:runtime.cwd}
+  raw_data: data/raw
+  processed_data: data/processed
+  checkpoints: data/checkpoints
+  outputs: outputs
+  scalers: data/processed/scalers
+  tensorboard: outputs/tensorboard
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: false
