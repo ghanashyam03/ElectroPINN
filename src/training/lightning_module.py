@@ -14,10 +14,28 @@ from training.metrics import mae, max_error, r2_score, rmse
 from utils.device import get_gpu_memory_mb
 
 
-def _supervised_loss(pred: torch.Tensor, batch: dict[str, torch.Tensor], mse: nn.MSELoss) -> torch.Tensor:
+def _supervised_loss(
+    pred: torch.Tensor,
+    batch: dict[str, torch.Tensor],
+    mse: nn.MSELoss,
+    huber_soc: nn.HuberLoss,
+) -> torch.Tensor:
     """Identical supervision for baseline and physics-guided data term."""
-    loss = mse(pred[..., 0:1], batch["soc_physical"])
-    loss = loss + mse(pred[..., 1:2], batch["voltage"].unsqueeze(-1))
+    pred_soc = pred[..., 0:1]
+    target_soc = batch["soc_physical"]
+
+    # Component 1 & 2: Huber loss and boundary emphasis weighting
+    raw_loss = huber_soc(pred_soc, target_soc)
+    weights = 1.0 + 0.5 * torch.abs(target_soc - 0.5)
+    weighted_loss = (raw_loss * weights).mean()
+
+    # Component 3: Range consistency penalty
+    pred_range = pred_soc.max() - pred_soc.min()
+    target_range = target_soc.max() - target_soc.min()
+    range_loss = torch.relu(target_range - pred_range)
+    total_soc_loss = weighted_loss + 0.2 * range_loss
+
+    loss = total_soc_loss + mse(pred[..., 1:2], batch["voltage"].unsqueeze(-1))
     loss = loss + mse(pred[..., 2:3], batch["temperature"].unsqueeze(-1))
     return loss
 
@@ -62,13 +80,14 @@ class BaselineLitModule(pl.LightningModule):
             dropout=dropout,
         )
         self.loss_fn = nn.MSELoss()
+        self.huber_soc = nn.HuberLoss(delta=0.1, reduction="none")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
     def _shared_step(self, batch: dict[str, torch.Tensor], stage: str) -> torch.Tensor:
         pred = self(batch["features"])
-        loss = _supervised_loss(pred, batch, self.loss_fn)
+        loss = _supervised_loss(pred, batch, self.loss_fn, self.huber_soc)
         self.log(f"{stage}_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         _log_soc_metrics(self, pred, batch, stage)
         mem = get_gpu_memory_mb()

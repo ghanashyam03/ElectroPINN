@@ -41,16 +41,21 @@ class BatterySequenceDataset(Dataset[dict[str, torch.Tensor]]):
         parquet_path: str | Path,
         use_normalized: bool = True,
         sequence_length: int = 32,
+        augment: bool = False,
+        seed: int = 42,
     ) -> None:
         self.path = Path(parquet_path)
         self.use_normalized = use_normalized
         self.sequence_length = sequence_length
+        self.augment = augment
+        self._base_seed = seed
         self.feature_cols = list(NORM_FEATURES if use_normalized else RAW_FEATURES)
         self._caches: dict[int, _SimulationCache] = {}
         self._index: list[tuple[int, int]] = []
         self._build_caches()
 
     def _build_caches(self) -> None:
+        self._rng = np.random.default_rng(self._base_seed)
         df = pl.read_parquet(self.path).sort(["simulation_id", "timestamp"])
         stride = max(1, self.sequence_length // 4)
 
@@ -93,8 +98,43 @@ class BatterySequenceDataset(Dataset[dict[str, torch.Tensor]]):
         end = start + self.sequence_length
         sl = slice(start, end)
 
+        features = cache.features[sl]
+        if self.augment:
+            features = features.copy()
+            # Deriving local seed per Correction 3
+            local_seed = int(self._base_seed) ^ (idx * 2654435761 % (2**31))
+            rng = np.random.default_rng(local_seed)
+
+            # AUGMENTATION 1 — Gaussian sensor noise
+            features[:, 0] += rng.normal(0, 0.008, size=features.shape[0])
+            features[:, 1] += rng.normal(0, 0.004, size=features.shape[0])
+            features[:, 2] += rng.normal(0, 0.002, size=features.shape[0])
+            features[:, 3] += rng.normal(0, 0.005, size=features.shape[0])
+
+            # AUGMENTATION 2 — Random current scaling
+            if rng.random() < 0.15:
+                scale = rng.uniform(0.96, 1.04)
+                features[:, 0] *= scale
+
+            # AUGMENTATION 3 — Random timestep jitter
+            jitter = rng.uniform(-0.005, 0.005, size=features.shape[0])
+            t_jittered = features[:, 3] + jitter
+            for i in range(1, len(t_jittered)):
+                if t_jittered[i] < t_jittered[i - 1]:
+                    t_jittered[i] = t_jittered[i - 1]
+            features[:, 3] = t_jittered
+
+            # AUGMENTATION 4 — Random sequence dropout
+            if rng.random() < 0.1:
+                k = int(rng.integers(1, 3))  # 1, 2, or 3
+                L = features.shape[0]
+                max_start = L - 2 - k
+                if max_start >= 2:
+                    start_idx = int(rng.integers(2, max_start + 1))
+                    features[start_idx : start_idx + k, :] = 0.0
+
         return {
-            "features": torch.from_numpy(cache.features[sl]),
+            "features": torch.from_numpy(features),
             "soc": torch.from_numpy(cache.soc_n[sl]).unsqueeze(-1),
             "soc_physical": torch.from_numpy(cache.soc_physical[sl]).unsqueeze(-1),
             "dt": torch.from_numpy(cache.dt[sl]),
@@ -130,10 +170,16 @@ class BatteryDataModule(pl_lightning.LightningDataModule):
         val_path = self.processed_dir / "val.parquet"
         test_path = self.processed_dir / "test.parquet"
         if stage in ("fit", None) and train_path.exists():
-            self.train_ds = BatterySequenceDataset(train_path, sequence_length=self.sequence_length)
-            self.val_ds = BatterySequenceDataset(val_path, sequence_length=self.sequence_length)
+            self.train_ds = BatterySequenceDataset(
+                train_path, sequence_length=self.sequence_length, augment=True
+            )
+            self.val_ds = BatterySequenceDataset(
+                val_path, sequence_length=self.sequence_length, augment=False
+            )
         if stage in ("test", "predict", None) and test_path.exists():
-            self.test_ds = BatterySequenceDataset(test_path, sequence_length=self.sequence_length)
+            self.test_ds = BatterySequenceDataset(
+                test_path, sequence_length=self.sequence_length, augment=False
+            )
 
     def train_dataloader(self) -> DataLoader:
         assert self.train_ds is not None

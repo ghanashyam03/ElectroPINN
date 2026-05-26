@@ -52,18 +52,31 @@ class PhysicsLossModule(nn.Module):
         self.config = config
         self.toggles = toggles or PhysicsLossToggles()
         self.mse = nn.MSELoss()
+        self.huber_soc = nn.HuberLoss(delta=0.1, reduction="none")
 
     def data_loss(
         self,
         predictions: torch.Tensor,
         batch: dict[str, torch.Tensor],
     ) -> torch.Tensor:
-        """Supervised MSE on SoC, voltage, and temperature."""
+        """Supervised combined loss on SoC, voltage, and temperature."""
         pred_soc = predictions[..., 0:1]
         pred_v = predictions[..., 1:2]
         pred_t = predictions[..., 2:3]
-        loss = self.mse(pred_soc, batch["soc_physical"])
-        loss = loss + self.mse(pred_v, batch["voltage"].unsqueeze(-1))
+        target_soc = batch["soc_physical"]
+
+        # Component 1 & 2: Huber loss and boundary emphasis weighting
+        raw_loss = self.huber_soc(pred_soc, target_soc)
+        weights = 1.0 + 0.5 * torch.abs(target_soc - 0.5)
+        weighted_loss = (raw_loss * weights).mean()
+
+        # Component 3: Range consistency penalty
+        pred_range = pred_soc.max() - pred_soc.min()
+        target_range = target_soc.max() - target_soc.min()
+        range_loss = torch.relu(target_range - pred_range)
+        total_soc_loss = weighted_loss + 0.2 * range_loss
+
+        loss = total_soc_loss + self.mse(pred_v, batch["voltage"].unsqueeze(-1))
         loss = loss + self.mse(pred_t, batch["temperature"].unsqueeze(-1))
         return loss
 

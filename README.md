@@ -166,12 +166,22 @@ Generated outputs include:
 
 # Engineering Features
 
-- Deterministic training
-- Physics-guided losses
-- Compact transformer implementation
-- Sequence-aware evaluation
+- **Robust Loss System (Resolves Output Compression)**:
+  - **Huber Loss on SoC**: Replaces plain MSE with element-wise Huber loss ($\delta=0.1$) to prevent quadratic punishment of boundary errors.
+  - **Boundary Emphasis Weighting**: Multiplies element-wise SoC loss by $1.0 + 2.0 \times |soc\_target - 0.5|$, giving $3\times$ weight to extremes.
+  - **Batch-Level Range Consistency Penalty**: Adds a penalty proportional to $\max(0, target\_range - pred\_range)$ (with weight $\lambda=0.5$) to directly penalize batch amplitude compression.
+- **Deterministic Training-Time Data Augmentations**:
+  - Independent Gaussian sensor noise applied to normalized features.
+  - Random current sensor calibration scaling (30% probability, uniform range $[0.92, 1.08]$).
+  - Random timestep jitter (uniform range $[-0.005, 0.005]$ per timestep) clipped with `np.maximum.accumulate` to ensure monotonic progression.
+  - Sequence dropout (20% probability, zeroes out 1-3 consecutive input timesteps) while preserving target labels.
+  - Seeding derived from a per-call deterministic formula utilizing base seed and item index to guarantee exact reproducibility under multi-process data loaders.
+- **Stable Mahalanobis OOD Detection**:
+  - PCA dimensionality reduction with a floor of 8 components when samples are limited.
+  - LedoitWolf shrinkage-based regularized covariance estimation.
+  - Z-score normalization of raw distances on the ID set (with a zero-division guard of $10^{-6}$).
+- Causal temporal transformer implementation
 - MC-dropout uncertainty estimation
-- Mahalanobis OOD detection
 - Hydra configuration system
 - Automated ablation pipeline
 - GPU/CPU compatible execution

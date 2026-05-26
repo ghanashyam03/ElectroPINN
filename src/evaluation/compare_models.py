@@ -129,9 +129,9 @@ def compare(
     # OOD detection
     id_lat = collect_latents(pinn, val_loader, device)
     ood_lat = collect_latents(pinn, test_loader, device)
-    mu, precision = fit_mahalanobis(id_lat)
-    id_scores = mahalanobis_scores(id_lat, mu, precision)
-    ood_scores = mahalanobis_scores(ood_lat, mu, precision)
+    mahalanobis_params = fit_mahalanobis(id_lat)
+    id_scores = mahalanobis_scores(id_lat, mahalanobis_params)
+    ood_scores = mahalanobis_scores(ood_lat, mahalanobis_params)
     plot_ood_histogram(id_scores, ood_scores, output_dir / "ood_detection_histogram")
 
     # Attention visualization (last layer)
