@@ -146,7 +146,7 @@ It is about improving:
 
 ## Predicted vs Actual SoC
 
-![Predicted vs Actual](evaluation/predicted_vs_actual_soc.png)
+![Predicted vs Actual](evaluation/2026-05-24/predicted_vs_actual_soc.png)
 
 The model successfully tracks overall SoC trends but still shows:
 - output compression,
@@ -157,7 +157,7 @@ The model successfully tracks overall SoC trends but still shows:
 
 ## Voltage Trajectory
 
-![Voltage Trajectory](evaluation/voltage_trajectory.png)
+![Voltage Trajectory](evaluation/2026-05-24/voltage_trajectory.png)
 
 The transformer captures smooth voltage dynamics and temporal continuity effectively.
 
@@ -169,7 +169,7 @@ The physics-guided model particularly improves:
 
 ## Error Distribution
 
-![Error Distribution](evaluation/error_distribution.png)
+![Error Distribution](evaluation/2026-05-24/error_distribution.png)
 
 Most prediction errors cluster tightly around zero, indicating:
 - stable learning,
@@ -180,7 +180,7 @@ Most prediction errors cluster tightly around zero, indicating:
 
 ## Generalization Performance
 
-![Generalization](evaluation/unseen_profile_generalization.png)
+![Generalization](evaluation/2026-05-24/unseen_profile_generalization.png)
 
 This is one of the most important results in the project.
 
@@ -192,7 +192,7 @@ The evaluation demonstrates:
 
 ## Attention Visualization
 
-![Attention Heatmap](evaluation/attention_visualization.png)
+![Attention Heatmap](evaluation/2026-05-24/attention_visualization.png)
 
 The causal transformer learns structured temporal dependencies rather than behaving like a simple feedforward regressor.
 
@@ -202,7 +202,7 @@ This validates the architectural upgrade from MLP → temporal transformer.
 
 ## OOD Detection
 
-![OOD Histogram](evaluation/ood_detection_histogram.png)
+![OOD Histogram](evaluation/2026-05-24/ood_detection_histogram.png)
 
 Mahalanobis latent-space scoring was implemented for OOD detection.
 
@@ -212,7 +212,7 @@ The implementation works conceptually, though score scaling still requires stabi
 
 ## Uncertainty Estimation
 
-![Uncertainty Distribution](evaluation/uncertainty_distribution.png)
+![Uncertainty Distribution](evaluation/2026-05-24/uncertainty_distribution.png)
 
 Monte Carlo dropout uncertainty estimation was added successfully.
 
@@ -312,4 +312,4 @@ This project successfully evolved into a:
 
 > highly robust, scientifically grounded, physics-guided temporal transformer system for robust battery state estimation.
 
-With the newly implemented calibration stabilizers, deterministic training-time data loader augmentations, and a robust Mahalanobis OOD detector, the model possesses industry-grade reliability under real-world sensor noise and unseen dynamic profiles while retaining a clean, focused research scope.
+With the newly implemented calibration stabilizers, deterministic training-time data loader augmentations, and a robust Mahalanobis OOD detector, the model possesses industry-grade reliability under real-world sensor noise and unseen dynamic profiles while retaining a clean, focused research scope.
